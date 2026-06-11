@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fabled Games</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: #111831;
+        --line: #22304f;
+        --ink: #d7e4ff;
+        --dim: #7d8db3;
+        --accent: #27e0c0;
+        --accent2: #ffb454;
+        --mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html, body {
+        min-height: 100%;
+        background: radial-gradient(1200px 600px at 50% -10%, #14204a 0%, var(--bg) 60%);
+        color: var(--ink);
+        font-family: var(--mono);
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 40px 16px 60px;
+        gap: 48px;
+      }
+
+      header {
+        text-align: center;
+      }
+
+      header h1 {
+        font-size: clamp(1.6rem, 5vw, 2.6rem);
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        color: var(--accent);
+        text-transform: uppercase;
+      }
+
+      header p {
+        margin-top: 8px;
+        font-size: 0.85rem;
+        color: var(--dim);
+        letter-spacing: 0.06em;
+      }
+
+      .games-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        width: min(1000px, 100%);
+      }
+
+      .game-card {
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+      }
+
+      .game-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 32px rgba(39, 224, 192, 0.12);
+      }
+
+      .game-card:active {
+        transform: translateY(0);
+      }
+
+      .card-thumb {
+        height: 140px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        background: linear-gradient(135deg, #0d1428 0%, #14204a 100%);
+        border-bottom: 1px solid var(--line);
+        user-select: none;
+      }
+
+      .card-body {
+        padding: 16px 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+      }
+
+      .card-title {
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: var(--accent2);
+        text-transform: uppercase;
+      }
+
+      .card-desc {
+        font-size: 0.78rem;
+        color: var(--dim);
+        line-height: 1.55;
+      }
+
+      .card-tag {
+        margin-top: auto;
+        padding-top: 12px;
+        font-size: 0.72rem;
+        color: var(--accent);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      footer {
+        font-size: 0.72rem;
+        color: var(--dim);
+        letter-spacing: 0.06em;
+        opacity: 0.6;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Fabled Games</h1>
+      <p>Browser-playable games — no install required</p>
+    </header>
+
+    <section class="games-grid">
+      <a class="game-card" href="age-of-ops/age-of-ops.html">
+        <div class="card-thumb">⚙️</div>
+        <div class="card-body">
+          <div class="card-title">Age of Ops</div>
+          <div class="card-desc">From punch cards to the singularity — manage your way through computing history.</div>
+          <div class="card-tag">▶ Play now</div>
+        </div>
+      </a>
+    </section>
+
+    <footer>fabled-games &mdash; 2026</footer>
+  </body>
+</html>
