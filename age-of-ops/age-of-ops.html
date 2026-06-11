@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGE OF OPS — from punch cards to the singularity</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#111831; --panel2:#0d1428; --line:#22304f;
+    --ink:#d7e4ff; --dim:#7d8db3; --accent:#27e0c0; --accent2:#ffb454;
+    --danger:#ff5d73; --ok:#7ee787;
+    --mono:ui-monospace,'Cascadia Code','JetBrains Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(1200px 600px at 50% -10%, #14204a 0%, var(--bg) 60%);
+    color:var(--ink); font-family:var(--mono); display:flex; flex-direction:column;
+    align-items:center; min-height:100vh; padding:10px;
+  }
+  .frame{width:min(1180px,100%); display:flex; flex-direction:column; gap:8px;}
+
+  /* header */
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px 12px;}
+  .logo{font-weight:800; letter-spacing:.12em; font-size:14px; color:var(--accent);}
+  .logo small{color:var(--dim); letter-spacing:.04em; font-weight:400}
+  .stats{display:flex; gap:14px; align-items:center; font-size:13px; flex-wrap:wrap}
+  .stat b{color:var(--accent2)}
+  .stat .age{color:var(--accent)}
+  .iconbtns{display:flex; gap:6px}
+  .iconbtns button{background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:8px; padding:5px 10px; font-family:var(--mono); cursor:pointer; font-size:12px;}
+  .iconbtns button:hover{border-color:var(--accent)}
+
+  /* canvas */
+  .stage{position:relative; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#000;}
+  canvas{display:block; width:100%; height:auto; image-rendering:auto;}
+  .scan{pointer-events:none; position:absolute; inset:0; opacity:.10; mix-blend-mode:overlay;
+    background:repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 3px);}
+
+  /* control deck */
+  .deck{display:flex; gap:10px; align-items:stretch; flex-wrap:wrap;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px;}
+  .group{display:flex; flex-direction:column; gap:6px; min-width:0}
+  .group .label{font-size:10px; color:var(--dim); letter-spacing:.15em; text-transform:uppercase}
+  .row{display:flex; gap:6px; flex-wrap:wrap}
+  .btn{
+    position:relative; background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    border-radius:8px; padding:7px 9px; font-family:var(--mono); font-size:12px; cursor:pointer;
+    text-align:left; min-width:118px;
+  }
+  .btn:hover:not(:disabled){border-color:var(--accent); transform:translateY(-1px)}
+  .btn:disabled{opacity:.45; cursor:not-allowed}
+  .btn .nm{display:block; font-weight:700}
+  .btn .cs{display:block; color:var(--accent2); font-size:11px}
+  .btn .key{position:absolute; top:4px; right:6px; font-size:9px; color:var(--dim)}
+  .btn.special{border-color:#5a3a86; background:#1a1233; min-width:150px}
+  .btn.special:hover:not(:disabled){border-color:#b07cff}
+  .btn.evolve{border-color:#3a6a3a; background:#10240f; min-width:150px}
+  .btn.evolve:hover:not(:disabled){border-color:var(--ok)}
+  .xpbar{height:6px; background:#0a0f1f; border-radius:4px; overflow:hidden; margin-top:5px; border:1px solid var(--line)}
+  .xpbar i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--ok),var(--accent));}
+  .queue{display:flex; gap:4px; min-height:14px; align-items:center}
+  .chip{width:34px; height:10px; border:1px solid var(--line); border-radius:3px; background:#0a0f1f; overflow:hidden}
+  .chip i{display:block; height:100%; width:0%; background:var(--accent2)}
+  .spacer{flex:1}
+
+  /* ticker */
+  .ticker{display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:6px 12px; font-size:12px; color:var(--dim); overflow:hidden; white-space:nowrap;}
+  .ticker b{color:var(--danger); flex:none}
+  .ticker span{overflow:hidden; text-overflow:ellipsis}
+
+  /* overlay */
+  .overlay{position:absolute; inset:0; background:rgba(5,8,18,.88); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px; text-align:center; padding:20px; z-index:5;}
+  .overlay h1{font-size:clamp(22px,4vw,40px); letter-spacing:.1em; color:var(--accent)}
+  .overlay p{max-width:560px; color:var(--ink); font-size:14px; line-height:1.6}
+  .overlay .sub{color:var(--dim); font-size:12px}
+  .overlay button{background:var(--accent); color:#06281f; font-weight:800; border:none; border-radius:8px;
+    padding:12px 26px; font-family:var(--mono); font-size:15px; cursor:pointer; letter-spacing:.08em;}
+  .overlay button:hover{transform:translateY(-1px)}
+  .hidden{display:none !important}
+  @media (max-width:720px){ .btn{min-width:96px; font-size:11px} .stats{font-size:11px} }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <div class="topbar">
+    <div class="logo">AGE OF OPS <small>// hold the line, hold the uptime</small></div>
+    <div class="stats">
+      <div class="stat">BUDGET <b id="hud-money">$0</b> <span id="hud-income" style="color:var(--dim)"></span></div>
+      <div class="stat">ERA <span class="age" id="hud-age">—</span></div>
+      <div class="stat" id="hud-enemy" style="color:var(--dim)"></div>
+    </div>
+    <div class="iconbtns">
+      <button id="btn-pause" title="Pause [P]">⏸ pause</button>
+      <button id="btn-mute" title="Mute [M]">🔊 sfx</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="game" width="1600" height="540"></canvas>
+    <div class="scan"></div>
+    <div class="overlay" id="overlay">
+      <h1 id="overlay-title">AGE OF OPS</h1>
+      <p id="overlay-sub">The year is 1964. <b>Legacy Systems Inc.</b> has declared war on progress and is marching on your datacenter, armed with fax machines and unshakable confidence.<br><br>
+      Hire units, build turrets, and evolve from the <b>Punch Card Era</b> all the way to the <b>Singularity</b> — before they migrate your base to a COBOL monolith.</p>
+      <p class="sub">[1][2][3] hire units · [T] build turret · [Q] special · [E] evolve era · [P] pause</p>
+      <button id="overlay-btn">BOOT UP ▸</button>
+    </div>
+  </div>
+
+  <div class="deck">
+    <div class="group">
+      <div class="label">Hire units</div>
+      <div class="row" id="units-row"></div>
+      <div class="queue" id="queue-row"></div>
+    </div>
+    <div class="group">
+      <div class="label">Defenses</div>
+      <div class="row" id="turret-row"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="group">
+      <div class="label">Big red buttons</div>
+      <div class="row">
+        <button class="btn special" id="btn-special"><span class="key">Q</span><span class="nm" id="special-name">—</span><span class="cs" id="special-cd">ready</span></button>
+        <button class="btn evolve" id="btn-evolve"><span class="key">E</span><span class="nm">EVOLVE ERA</span><span class="cs" id="xp-label">0 / 0 XP</span>
+          <span class="xpbar"><i id="xp-fill"></i></span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ticker"><b>WAR NEWS ▸</b><span id="ticker-text">Reports coming in…</span></div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   AGE OF OPS — an Age of War homage where the ages of mankind
+   are replaced by the ages of computing, and everyone dies of
+   preventable production incidents.
+   Single file. No dependencies. Deploy anywhere a <canvas> fits.
+   ============================================================ */
+
+const W = 1600, H = 540, GROUND = H - 64;
+const PBASE_X = 92, EBASE_X = W - 92;
+const UNIT_CAP = 14, QUEUE_CAP = 5;
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+/* ---------------- audio (tiny synth, all optional) ---------------- */
+let AC = null, muted = false;
+function initAudio(){ try{ if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+function tone(f, dur, type, vol, when, slideTo){
+  if(!AC || muted) return;
+  try{
+    const t0 = AC.currentTime + (when||0);
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type||'square'; o.frequency.setValueAtTime(f, t0);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20,slideTo), t0+dur);
+    g.gain.setValueAtTime(vol||0.04, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g); g.connect(AC.destination); o.start(t0); o.stop(t0+dur+0.02);
+  }catch(e){}
+}
+const sfx = {
+  spawn(){ tone(220,.08,'square',.03,0,440); },
+  hit(){ tone(140,.04,'sawtooth',.018); },
+  kill(){ tone(520,.07,'triangle',.04,0,880); },
+  coin(){ tone(880,.06,'triangle',.03,0,1320); },
+  evolve(){ [262,330,392,523,659].forEach((f,i)=>tone(f,.12,'square',.045,i*.09)); },
+  turret(){ tone(180,.12,'square',.04,0,90); },
+  cards(){ for(let i=0;i<10;i++) tone(900+Math.random()*900,.05,'triangle',.02,i*.07); },
+  screech(){ // a loving tribute to 56k
+    const seq=[2100,1300,1800,980,2400,1100,1700,2300,800,2000];
+    seq.forEach((f,i)=>tone(f,.09,i%2?'square':'sawtooth',.05,i*.085));
+    tone(300,.9,'sawtooth',.02,0.2,2800);
+  },
+  deploy(){ for(let i=0;i<5;i++) tone(90,.25,'sawtooth',.06,i*.18,40); },
+  rmrf(){ tone(1800,1.6,'sawtooth',.05,0,60); },
+  win(){ [392,494,587,784,988].forEach((f,i)=>tone(f,.18,'triangle',.06,i*.13)); },
+  lose(){ [392,330,262,196,131].forEach((f,i)=>tone(f,.2,'sawtooth',.05,i*.16)); },
+};
+
+/* ---------------- flavor ---------------- */
+const DEATH_MSGS = ['404: soldier not found','task failed successfully','segfault','kernel panic','OOMKilled',
+  'CrashLoopBackOff','yeeted to /dev/null','deprecated','EOL reached','garbage collected','blue screened',
+  'connection reset by peer','works on my machine ✝','uninstalled','exit code 137','permanently on PTO',
+  'merged into the void','rage quit','rolled back','retired to a farm upstate'];
+const HEADLINES = [
+  'Analysts confirm: it was DNS the whole time.',
+  'Legacy Systems Inc. announces bold 5-year plan to upgrade to IE7.',
+  'Both armies pause battle to argue about tabs vs spaces. Casualties: morale.',
+  'Punch card futures up 12% on heavy artillery demand.',
+  'Survey: 9 of 10 soldiers fear the Friday Deploy more than death itself.',
+  'Peace talks collapse over a YAML indentation dispute.',
+  'Local SRE answers page mid-battle, closes it as "known issue".',
+  'Modem screech officially classified as a war crime in 3 countries.',
+  'War economists ask: "Have you considered just turning it off and on again?"',
+  'Intern promoted to Senior Intern after surviving three whole waves.',
+  'AGI politely asks everyone to stop unplugging it.',
+  'Cloud Age veterans report phantom pager vibrations.',
+  'Punch card chad confetti shortage declared. Recyclers thrilled.',
+  'Legacy Systems Inc. denies its base is held together by Excel macros.',
+  'Frontline report: someone shouted "it\'s not a bug, it\'s a feature" and charged.',
+  'Weather forecast: 100% chance of cloud. Migration advised.',
+  'Historians agree the war started over an unresolved merge conflict.',
+];
+
+/* ---------------- era / unit configuration ---------------- */
+// Tier templates (age 0 baseline). Scaled per era below.
+const TIERS = [
+  {cost:25,  hp:65,  dmg:8,  range:34,  speed:62, atkCd:0.85, build:1.1, ranged:false, scale:0.95},
+  {cost:55,  hp:48,  dmg:12, range:225, speed:52, atkCd:1.15, build:2.0, ranged:true,  scale:1.0},
+  {cost:120, hp:210, dmg:24, range:40,  speed:38, atkCd:1.25, build:3.2, ranged:false, scale:1.32},
+];
+const AGE_STAT_MULT = [1, 2.1, 4.4, 9.2];
+const AGE_COST_MULT = [1, 1.9, 3.6, 6.8];
+const XP_TO_EVOLVE  = [420, 1700, 5200]; // thresholds to reach era 2,3,4
+
+const ERAS = [
+  { name:'Punch Card Era', year:'1964',
+    sky:['#d9c9a3','#bba26e'], ground:'#8a6a45', deco:'mainframe',
+    units:[
+      {name:'Intern',         desc:'Carries the punch cards. Carries the company.', proj:null},
+      {name:'Card Dealer',    desc:'Deals 80 columns of pain per second.',          proj:'card'},
+      {name:'Mainframe Monk', desc:'Has read the manual. ALL of it.',               proj:null},
+    ],
+    turret:{name:'Stapler Catapult', proj:'staple', cost:170, dmg:15, range:330, atkCd:1.0},
+    special:{name:'CARD STORM', desc:'It is raining punch cards. Hallelujah.', cd:50},
+  },
+  { name:'Dial-Up Era', year:'1997',
+    sky:['#7fa7c9','#4a6f96'], ground:'#5d6b53', deco:'office',
+    units:[
+      {name:'Helpdesk Hero',  desc:'"Have you tried turning it off and on again?" *swings CRT*', proj:null},
+      {name:'Floppy Flinger', desc:'1.44MB of pure violence.',                                   proj:'floppy'},
+      {name:'Server Room Troll', desc:'Lives behind the racks. Feeds on tickets.',               proj:null},
+    ],
+    turret:{name:'Firewall (literal)', proj:'fireball', cost:330, dmg:31, range:350, atkCd:1.0},
+    special:{name:'56K SCREECH', desc:'The sound. THE SOUND. Damages and stuns all enemies.', cd:50},
+  },
+  { name:'Cloud Era', year:'2016',
+    sky:['#8fd0ff','#4a90d9'], ground:'#4a5d6e', deco:'cloud',
+    units:[
+      {name:'Standup Survivor', desc:'No blockers. Only targets.',                  proj:null},
+      {name:'YAML Wrangler',    desc:'Two spaces. Always. Or else.',                proj:'scroll'},
+      {name:'On-Call SRE',      desc:'Has not slept since 2019. Feels no pain.',    proj:null},
+    ],
+    turret:{name:'Auto-Scaler', proj:'pod', cost:640, dmg:62, range:370, atkCd:0.95},
+    special:{name:'FRIDAY DEPLOY', desc:'Untested commits rain from the sky, on fire.', cd:50},
+  },
+  { name:'The Singularity', year:'20??',
+    sky:['#1a0b3a','#3d1166'], ground:'#1b1140', deco:'synth',
+    units:[
+      {name:'Prompt Engineer', desc:'Weaponized politeness: "Please die. Thank you!"', proj:null},
+      {name:'Attack Drone',    desc:'Delivers packages. And judgement.',               proj:'laser'},
+      {name:'AGI Avatar',      desc:'Aligned with exactly one value: winning.',        proj:null},
+    ],
+    turret:{name:'Orbital Laser', proj:'beamshot', cost:1250, dmg:125, range:400, atkCd:0.9},
+    special:{name:'rm -rf /enemies', desc:'--no-preserve-root. A beam sweeps the field clean.', cd:55},
+  },
+];
+function unitStats(age, tier){
+  const t = TIERS[tier];
+  return {
+    cost: Math.round(t.cost * AGE_COST_MULT[age]),
+    hp:   Math.round(t.hp   * AGE_STAT_MULT[age]),
+    dmg:  Math.round(t.dmg  * AGE_STAT_MULT[age]),
+    range:t.range, speed:t.speed, atkCd:t.atkCd, build:t.build,
+    ranged:t.ranged, scale:t.scale,
+  };
+}
+function turretStats(age){
+  const t = ERAS[age].turret;
+  return {cost:t.cost, dmg:t.dmg, range:t.range, atkCd:t.atkCd, proj:t.proj, name:t.name};
+}
+
+/* ---------------- state ---------------- */
+let S = null, running = false, paused = false, lastT = 0;
+function reset(){
+  S = {
+    time:0, over:false, won:false,
+    money:120, income:4, xp:0,
+    age:0, baseHp:1100, baseMax:1100,
+    units:[], projectiles:[], fx:[], floats:[], particles:[],
+    queue:[], turrets:[null,null],
+    specialCd:18,
+    enemy:{
+      money:60, income:4, xp:0, age:0, baseHp:1100, baseMax:1100,
+      queue:[], turrets:[null,null], specialCd:40, decideT:6,
+    },
+    flash:0, tickerT:0, tickerIdx:Math.floor(Math.random()*HEADLINES.length),
+  };
+}
+
+/* ---------------- helpers ---------------- */
+const R = (a,b)=>a+Math.random()*(b-a);
+function pushFloat(x,y,txt,color){ S.floats.push({x,y,txt,color:color||'#fff',t:0,life:1.4}); }
+function burst(x,y,color,n){
+  for(let i=0;i<(n||10);i++) S.particles.push({x,y:y-14,vx:R(-90,90),vy:R(-150,-20),t:0,life:R(.4,.9),color,sz:R(2,4)});
+}
+function ticker(msg){ const el=document.getElementById('ticker-text'); el.textContent=msg; S.tickerT=0; }
+
+/* ---------------- units ---------------- */
+function makeUnit(side, age, tier){
+  const st = unitStats(age, tier);
+  return {
+    side, age, tier, ...st, maxHp:st.hp,
+    x: side===0 ? PBASE_X+56 : EBASE_X-56,
+    y: GROUND + R(-4,4),
+    cd:0, anim:R(0,6), stun:0, dead:false,
+  };
+}
+function queueUnit(isEnemy, tier){
+  const me = isEnemy ? S.enemy : S;
+  const age = me.age, st = unitStats(age,tier);
+  const q = me.queue;
+  if(q.length >= QUEUE_CAP) return false;
+  if(me.money < st.cost) return false;
+  me.money -= st.cost;
+  q.push({tier, t:0, build:st.build});
+  if(!isEnemy){ sfx.spawn(); renderShop(); }
+  return true;
+}
+function updateQueue(me, isEnemy, dt){
+  if(me.queue.length===0) return;
+  const sideUnits = S.units.filter(u=>u.side===(isEnemy?1:0)).length;
+  const q = me.queue[0];
+  q.t += dt;
+  if(q.t >= q.build && sideUnits < UNIT_CAP){
+    me.queue.shift();
+    S.units.push(makeUnit(isEnemy?1:0, me.age, q.tier));
+  }
+}
+
+/* ---------------- combat ---------------- */
+function alliesAhead(u){
+  let nearest = Infinity;
+  for(const o of S.units){
+    if(o===u || o.side!==u.side) continue;
+    const d = u.side===0 ? o.x-u.x : u.x-o.x;
+    if(d>0 && d<nearest) nearest = d;
+  }
+  return nearest;
+}
+function nearestEnemy(u){
+  let best=null, bd=Infinity;
+  for(const o of S.units){
+    if(o.side===u.side || o.dead) continue;
+    const d = u.side===0 ? o.x-u.x : u.x-o.x;
+    if(d>-8 && d<bd){ bd=d; best=o; }
+  }
+  return {t:best, d:bd};
+}
+function dealDamage(target, dmg, killerSide){
+  target.hp -= dmg;
+  if(target.hp<=0 && !target.dead){
+    target.dead = true;
+    burst(target.x, target.y, target.side===0?'#27e0c0':'#ffb454', 14);
+    if(Math.random()<.55) pushFloat(target.x, target.y-46, DEATH_MSGS[Math.floor(Math.random()*DEATH_MSGS.length)], '#ff8da0');
+    const bounty = Math.round(target.cost*0.62)+8, xp = Math.round(target.cost*0.95);
+    if(killerSide===0){ S.money += bounty; S.xp += xp; pushFloat(target.x, target.y-30, '+$'+bounty, '#ffd479'); sfx.kill(); }
+    else { S.enemy.money += Math.round(bounty*0.7); S.enemy.xp += xp; }
+  }
+}
+function hitBase(side, dmg, bySide){
+  if(side===0){ S.baseHp -= dmg; if(bySide===1){ S.enemy.xp += dmg*0.5; } }
+  else { S.enemy.baseHp -= dmg; if(bySide===0){ S.xp += dmg*0.5; S.money += dmg*0.12; } }
+}
+function fireProjectile(u, target){
+  const dir = u.side===0?1:-1;
+  const type = ERAS[u.age].units[u.tier].proj || 'card';
+  const lob = (type==='card'||type==='floppy'||type==='scroll');
+  S.projectiles.push({
+    x:u.x+dir*12, y:u.y-30*u.scale, vx:dir*(type==='laser'?620:430), vy:lob?-55:0,
+    grav:lob?170:0, dmg:u.dmg, side:u.side, type, aoe:0,
+  });
+}
+function turretFire(side, slot, tu, dt){
+  tu.cd -= dt;
+  if(tu.cd>0) return;
+  const tx = side===0 ? PBASE_X+(slot?14:-26) : EBASE_X-(slot?14:-26);
+  const ty = GROUND-150-(slot?44:0);
+  let best=null,bd=Infinity;
+  for(const o of S.units){
+    if(o.side===side||o.dead) continue;
+    const d = Math.abs(o.x-tx);
+    if(d<tu.range && d<bd){ bd=d; best=o; }
+  }
+  if(best){
+    tu.cd = tu.atkCd;
+    const dir = side===0?1:-1;
+    const lob = (tu.proj==='staple'||tu.proj==='pod');
+    S.projectiles.push({x:tx, y:ty, vx:dir*460, vy:lob?-90:R(-10,30), grav:lob?200:0,
+      dmg:tu.dmg, side, type:tu.proj, aoe:tu.proj==='fireball'?34:(tu.proj==='pod'?40:0)});
+    if(side===0) sfx.hit();
+  }
+}
+
+/* ---------------- specials ---------------- */
+function castSpecial(isEnemy){
+  const me = isEnemy?S.enemy:S;
+  if(me.specialCd>0) return;
+  const age = me.age;
+  me.specialCd = ERAS[age].special.cd;
+  const side = isEnemy?1:0;
+  const xMin = side===0 ? W*0.42 : PBASE_X+30;
+  const xMax = side===0 ? EBASE_X-30 : W*0.58;
+  const M = AGE_STAT_MULT[age];
+  if(age===0){
+    S.fx.push({type:'rain', proj:'card', side, xMin, xMax, count:26, interval:.06, t:0, n:0, dmg:Math.round(16*M), aoe:26});
+    if(!isEnemy) sfx.cards();
+  } else if(age===1){
+    S.fx.push({type:'rings', x: side===0?PBASE_X:EBASE_X, t:0, life:1.6});
+    for(const u of S.units){ if(u.side!==side && !u.dead){ dealDamage(u, Math.round(34*M), side); u.stun = Math.max(u.stun,2.2); } }
+    sfx.screech();
+  } else if(age===2){
+    S.fx.push({type:'rain', proj:'meteor', side, xMin, xMax, count:16, interval:.11, t:0, n:0, dmg:Math.round(26*M), aoe:46});
+    sfx.deploy();
+  } else {
+    S.fx.push({type:'beam', side, x: side===0? W*0.40 : W*0.60, dir: side===0?1:-1, speed:330, life:2.4, t:0, dps:Math.round(220*M)});
+    sfx.rmrf();
+  }
+  ticker((isEnemy?'Legacy Systems Inc. unleashes ':'You unleash ')+ERAS[age].special.name+'! '+ERAS[age].special.desc);
+  if(!isEnemy) renderShop();
+}
+function updateFx(dt){
+  for(const f of S.fx){
+    f.t += dt;
+    if(f.type==='rain'){
+      while(f.n < f.count && f.t > f.n*f.interval){
+        f.n++;
+        S.projectiles.push({x:R(f.xMin,f.xMax), y:-20, vx:R(-25,25), vy:R(170,260), grav:140,
+          dmg:f.dmg, side:f.side, type:f.proj, aoe:f.aoe, fromSky:true});
+      }
+      if(f.n>=f.count) f.dead = true;
+    } else if(f.type==='rings'){
+      if(f.t>f.life) f.dead=true;
+    } else if(f.type==='beam'){
+      f.x += f.dir*f.speed*dt;
+      for(const u of S.units){
+        if(u.side!==f.side && !u.dead && Math.abs(u.x-f.x)<34) dealDamage(u, f.dps*dt, f.side);
+      }
+      if(f.t>f.life) f.dead=true;
+    }
+  }
+  S.fx = S.fx.filter(f=>!f.dead);
+}
+
+/* ---------------- evolution ---------------- */
+function tryEvolve(isEnemy){
+  const me = isEnemy?S.enemy:S;
+  if(me.age>=3) return false;
+  const need = XP_TO_EVOLVE[me.age];
+  if(me.xp < need) return false;
+  me.xp -= need;
+  me.age++;
+  me.income = 4 + me.age*4;
+  me.baseMax += 700; me.baseHp = Math.min(me.baseMax, me.baseHp+700);
+  S.flash = 0.7;
+  if(!isEnemy){
+    sfx.evolve();
+    ticker('You have entered the '+ERAS[me.age].name+' ('+ERAS[me.age].year+'). The future is now, and it is on fire.');
+    renderShop();
+  } else {
+    ticker('Legacy Systems Inc. has entered the '+ERAS[me.age].name+'. They expensed it.');
+  }
+  return true;
+}
+
+/* ---------------- enemy AI ---------------- */
+function updateAI(dt){
+  const E = S.enemy;
+  const ramp = Math.min(1.4, 0.7 + S.time/300*0.35);
+  E.money += E.income*ramp*dt;
+  E.specialCd = Math.max(0, E.specialCd-dt);
+  if(E.xp >= (E.age<3 ? XP_TO_EVOLVE[E.age]*1.3 : Infinity)) tryEvolve(true);
+  E.decideT -= dt;
+  if(E.decideT<=0){
+    E.decideT = R(1.4,3.0);
+    // build a turret occasionally
+    const slot = E.turrets[0]?(E.turrets[1]?-1:1):0;
+    const tc = turretStats(E.age).cost;
+    if(slot>=0 && E.money>tc*1.35 && Math.random()<0.3){
+      E.turrets[slot] = {...turretStats(E.age), cd:0, age:E.age};
+      E.money -= tc;
+    } else {
+      const r = Math.random();
+      const tier = r<0.5?0 : (r<0.82?1:2);
+      queueUnit(true, tier);
+    }
+    // special: if player units crossing into enemy half
+    const threat = S.units.filter(u=>u.side===0 && !u.dead && u.x>W*0.58).length;
+    if(E.specialCd<=0 && threat>=4) castSpecial(true);
+  }
+  updateQueue(E, true, dt);
+}
+
+/* ---------------- main update ---------------- */
+function update(dt){
+  S.time += dt;
+  S.money += S.income*dt;
+  S.specialCd = Math.max(0, S.specialCd-dt);
+  S.flash = Math.max(0, S.flash-dt);
+  updateQueue(S, false, dt);
+  updateAI(dt);
+  updateFx(dt);
+
+  // units
+  for(const u of S.units){
+    if(u.dead) continue;
+    u.cd = Math.max(0, u.cd-dt);
+    if(u.stun>0){ u.stun-=dt; continue; }
+    const {t:enemy, d:edist} = nearestEnemy(u);
+    const baseDist = u.side===0 ? (EBASE_X-44)-u.x : u.x-(PBASE_X+44);
+    const inRangeUnit = enemy && edist <= u.range;
+    const inRangeBase = baseDist <= u.range;
+    if(inRangeUnit || inRangeBase){
+      if(u.cd<=0){
+        u.cd = u.atkCd;
+        if(u.ranged){ fireProjectile(u, enemy); }
+        else {
+          if(inRangeUnit) dealDamage(enemy, u.dmg, u.side);
+          else hitBase(u.side===0?1:0, u.dmg, u.side);
+          burst(u.x + (u.side===0?u.range*0.7:-u.range*0.7), u.y-10, '#ffffff', 3);
+        }
+      }
+    } else {
+      const ahead = alliesAhead(u);
+      if(ahead > 26){
+        u.x += (u.side===0?1:-1)*u.speed*dt;
+        u.anim += dt*10;
+      }
+    }
+  }
+
+  // projectiles
+  for(const p of S.projectiles){
+    p.vy += (p.grav||0)*dt;
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.spin = (p.spin||0)+dt*9;
+    let hit=false;
+    for(const u of S.units){
+      if(u.side===p.side || u.dead) continue;
+      if(Math.abs(u.x-p.x)<15 && p.y>u.y-46 && p.y<u.y+6){
+        dealDamage(u, p.dmg, p.side);
+        if(p.aoe){ for(const o of S.units){ if(o!==u && o.side!==p.side && !o.dead && Math.abs(o.x-p.x)<p.aoe) dealDamage(o, p.dmg*0.6, p.side); } }
+        hit=true; burst(p.x,p.y+10,'#ffe9a8',5); break;
+      }
+    }
+    if(!hit && !p.fromSky){
+      if(p.side===0 && p.x>EBASE_X-46){ hitBase(1,p.dmg,0); hit=true; burst(p.x,p.y,'#ffd479',6); }
+      if(p.side===1 && p.x<PBASE_X+46){ hitBase(0,p.dmg,1); hit=true; burst(p.x,p.y,'#ff8da0',6); }
+    }
+    if(p.y>GROUND+8){ if(p.fromSky){ burst(p.x,GROUND+8,p.type==='meteor'?'#ff9a3d':'#fff',6);} hit=true; }
+    if(p.x<-30||p.x>W+30) hit=true;
+    if(hit) p.dead=true;
+  }
+  S.projectiles = S.projectiles.filter(p=>!p.dead);
+  S.units = S.units.filter(u=>!u.dead);
+
+  // turrets
+  S.turrets.forEach((tu,i)=>{ if(tu) turretFire(0,i,tu,dt); });
+  S.enemy.turrets.forEach((tu,i)=>{ if(tu) turretFire(1,i,tu,dt); });
+
+  // particles / floats
+  for(const pa of S.particles){ pa.t+=dt; pa.vy+=320*dt; pa.x+=pa.vx*dt; pa.y+=pa.vy*dt; }
+  S.particles = S.particles.filter(p=>p.t<p.life);
+  for(const fl of S.floats){ fl.t+=dt; fl.y-=22*dt; }
+  S.floats = S.floats.filter(f=>f.t<f.life);
+
+  // ticker rotation
+  S.tickerT += dt;
+  if(S.tickerT>8){
+    S.tickerT=0; S.tickerIdx=(S.tickerIdx+1)%HEADLINES.length;
+    document.getElementById('ticker-text').textContent = HEADLINES[S.tickerIdx];
+  }
+
+  // win/lose
+  if(!S.over){
+    if(S.enemy.baseHp<=0){ S.over=true; S.won=true; endGame(); }
+    else if(S.baseHp<=0){ S.over=true; S.won=false; endGame(); }
+  }
+  updateHud();
+}
+
+/* ---------------- drawing ---------------- */
+function drawBackground(){
+  const era = ERAS[S.age];
+  const g = ctx.createLinearGradient(0,0,0,GROUND);
+  g.addColorStop(0,era.sky[0]); g.addColorStop(1,era.sky[1]);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,GROUND);
+  // era decorations
+  ctx.save(); ctx.globalAlpha=.5;
+  if(era.deco==='mainframe'){
+    ctx.fillStyle='#6e5436';
+    for(let i=0;i<7;i++){ const x=140+i*210; ctx.fillRect(x,GROUND-170,70,170); ctx.fillStyle='#4f3b24'; ctx.fillRect(x+10,GROUND-150,50,30); ctx.fillStyle='#6e5436'; }
+  } else if(era.deco==='office'){
+    ctx.fillStyle='#2f4a66';
+    for(let i=0;i<9;i++){ const x=80+i*180, h=90+((i*53)%120); ctx.fillRect(x,GROUND-h,80,h); }
+    ctx.fillStyle='#cfe3f2'; for(let i=0;i<5;i++){ ctx.beginPath(); ctx.ellipse(200+i*300,90+(i%2)*30,46,16,0,0,7); ctx.fill(); }
+  } else if(era.deco==='cloud'){
+    ctx.fillStyle='#ffffff';
+    for(let i=0;i<6;i++){ const x=120+i*260,y=70+(i%3)*40; ctx.beginPath(); ctx.ellipse(x,y,54,20,0,0,7); ctx.ellipse(x+38,y+6,40,16,0,0,7); ctx.fill(); }
+    ctx.fillStyle='#37506b'; for(let i=0;i<8;i++){ const x=100+i*195; ctx.fillRect(x,GROUND-120,46,120); ctx.fillStyle='#7ee787'; ctx.fillRect(x+6,GROUND-110,6,4); ctx.fillRect(x+6,GROUND-98,6,4); ctx.fillStyle='#37506b'; }
+  } else {
+    // synthwave: striped sun + grid + ridge
+    const sx=W/2, sy=GROUND-180;
+    const sg=ctx.createLinearGradient(0,sy-90,0,sy+90); sg.addColorStop(0,'#ffd479'); sg.addColorStop(1,'#ff4f9a');
+    ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(sx,sy,90,0,7); ctx.fill();
+    ctx.fillStyle=era.sky[0]; for(let i=0;i<5;i++) ctx.fillRect(sx-95, sy+8+i*16, 190, 6+i*1.5);
+    ctx.fillStyle='#120a30'; ctx.beginPath(); ctx.moveTo(0,GROUND);
+    for(let x=0;x<=W;x+=160) ctx.lineTo(x+80,GROUND-60-((x/160)%3)*26), ctx.lineTo(x+160,GROUND);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,79,154,.5)'; ctx.lineWidth=1;
+    for(let i=1;i<6;i++){ ctx.beginPath(); ctx.moveTo(0,GROUND+i*i*2); ctx.lineTo(W,GROUND+i*i*2); ctx.stroke(); }
+  }
+  ctx.restore();
+  // ground
+  ctx.fillStyle=era.ground; ctx.fillRect(0,GROUND,W,H-GROUND);
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(0,GROUND,W,4);
+}
+function drawBase(side){
+  const me = side===0?S:S.enemy;
+  const x = side===0?PBASE_X:EBASE_X, age=me.age;
+  ctx.save(); ctx.translate(x,GROUND);
+  if(side===1) ctx.scale(-1,1);
+  if(age===0){ // mainframe cabinet + tape reels
+    ctx.fillStyle='#cdb892'; ctx.fillRect(-46,-150,92,150);
+    ctx.fillStyle='#8d764f'; ctx.fillRect(-46,-150,92,12);
+    ctx.fillStyle='#3a3a3a';
+    ctx.beginPath(); ctx.arc(-18,-110,14,0,7); ctx.arc(18,-110,14,0,7); ctx.fill();
+    ctx.fillStyle='#cdb892'; ctx.beginPath(); ctx.arc(-18,-110,5,0,7); ctx.arc(18,-110,5,0,7); ctx.fill();
+    ctx.fillStyle='#9c2b2b'; ctx.fillRect(-30,-70,12,8); ctx.fillStyle='#2b9c4a'; ctx.fillRect(-6,-70,12,8);
+  } else if(age===1){ // beige tower + CRT
+    ctx.fillStyle='#d8d2bf'; ctx.fillRect(-46,-150,92,150);
+    ctx.fillStyle='#b9b3a0'; ctx.fillRect(-36,-140,72,40);
+    ctx.fillStyle='#1f4f3f'; ctx.fillRect(-30,-134,60,28);
+    ctx.fillStyle='#62e2a8'; ctx.font='10px monospace'; ctx.fillText('C:\\>_',-26,-116);
+    ctx.fillStyle='#8a857a'; for(let i=0;i<4;i++) ctx.fillRect(-36,-86+i*16,72,6);
+  } else if(age===2){ // server rack + cloud
+    ctx.fillStyle='#2c3a4a'; ctx.fillRect(-46,-150,92,150);
+    for(let i=0;i<6;i++){ ctx.fillStyle='#1c2733'; ctx.fillRect(-38,-140+i*23,76,16);
+      ctx.fillStyle = (Math.floor(S.time*3)+i)%2 ? '#7ee787':'#27e0c0'; ctx.fillRect(28,-136+i*23,5,5); }
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(0,-176,38,14,0,0,7); ctx.ellipse(24,-170,24,10,0,0,7); ctx.fill();
+  } else { // singularity pylon + orb
+    ctx.fillStyle='#241654'; ctx.fillRect(-30,-110,60,110);
+    ctx.strokeStyle='#ff4f9a'; ctx.lineWidth=2; ctx.strokeRect(-30,-110,60,110);
+    const pulse = 8+Math.sin(S.time*4)*4;
+    const og=ctx.createRadialGradient(0,-140,4,0,-140,34+pulse);
+    og.addColorStop(0,'#fff'); og.addColorStop(.4,'#b07cff'); og.addColorStop(1,'rgba(176,124,255,0)');
+    ctx.fillStyle=og; ctx.beginPath(); ctx.arc(0,-140,34+pulse,0,7); ctx.fill();
+  }
+  ctx.restore();
+  // turret mounts + turrets
+  for(let i=0;i<2;i++){
+    const tx = side===0 ? x+(i?14:-26) : x-(i?14:-26);
+    const ty = GROUND-150-(i?44:0);
+    ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(tx-16,ty+8,32,7);
+    const tu = me.turrets[i];
+    if(tu){
+      ctx.save(); ctx.translate(tx,ty); if(side===1) ctx.scale(-1,1);
+      const ta = tu.age;
+      if(ta===0){ ctx.fillStyle='#777'; ctx.fillRect(-10,-6,20,12); ctx.strokeStyle='#bbb'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,-2); ctx.lineTo(16,-14); ctx.stroke(); }
+      else if(ta===1){ ctx.fillStyle='#c43e1c'; ctx.fillRect(-12,-10,24,16); ctx.fillStyle='#ff9a3d'; ctx.beginPath(); ctx.moveTo(-6,-10); ctx.lineTo(0,-22); ctx.lineTo(6,-10); ctx.fill(); }
+      else if(ta===2){ ctx.fillStyle='#326ce5'; ctx.beginPath(); ctx.arc(0,-6,11,0,7); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='11px monospace'; ctx.fillText('⎈',-5,-2); }
+      else { ctx.fillStyle='#b07cff'; ctx.beginPath(); ctx.moveTo(0,-22); ctx.lineTo(10,0); ctx.lineTo(-10,0); ctx.fill(); ctx.fillStyle='#fff'; ctx.fillRect(-2,-26,4,6); }
+      ctx.restore();
+    }
+  }
+  // hp bar
+  const frac = Math.max(0, (side===0?S.baseHp/S.baseMax:S.enemy.baseHp/S.enemy.baseMax));
+  const bx = side===0? x-60 : x-60;
+  ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(bx,GROUND-230,120,10);
+  ctx.fillStyle= frac>.5?'#7ee787':(frac>.25?'#ffb454':'#ff5d73');
+  ctx.fillRect(bx+1,GROUND-229,118*frac,8);
+  ctx.fillStyle='#dfe9ff'; ctx.font='11px monospace'; ctx.textAlign='center';
+  ctx.fillText(side===0?'YOU · '+ERAS[me.age].year : 'LEGACY SYSTEMS INC. · '+ERAS[me.age].year, x, GROUND-238);
+  ctx.textAlign='left';
+}
+function drawUnit(u){
+  const s=u.scale, dir=u.side===0?1:-1;
+  // age-3 ranged unit is a floating drone — entirely different sprite
+  if(u.age===3 && u.tier===1){
+    ctx.save(); ctx.translate(u.x,u.y); if(dir<0) ctx.scale(-1,1);
+    const hov = Math.sin(u.anim*1.6)*3;
+    ctx.fillStyle=u.side===0?'#27e0c0':'#9aa8c4';
+    ctx.beginPath(); ctx.ellipse(0,-30+hov,11,6,0,0,7); ctx.fill();
+    ctx.strokeStyle='#dfe9ff'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(-14,-36+hov); ctx.lineTo(-4,-34+hov); ctx.moveTo(14,-36+hov); ctx.lineTo(4,-34+hov); ctx.stroke();
+    ctx.fillStyle='#ff5d73'; ctx.beginPath(); ctx.arc(5,-30+hov,2,0,7); ctx.fill();
+    if(u.stun>0){ ctx.fillStyle='#ffd479'; ctx.font='10px monospace'; ctx.fillText('✶ ✶', -8, -48); }
+    ctx.restore();
+    if(u.hp<u.maxHp){
+      ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(u.x-14,u.y-50,28,4);
+      ctx.fillStyle=u.side===0?'#7ee787':'#ff5d73'; ctx.fillRect(u.x-13,u.y-49,26*Math.max(0,u.hp/u.maxHp),2);
+    }
+    return;
+  }
+  ctx.save(); ctx.translate(u.x,u.y); if(dir<0) ctx.scale(-1,1);
+  const walking = u.stun<=0;
+  const sw = walking? Math.sin(u.anim)*5*s : 0;
+  // legs
+  ctx.strokeStyle='#1c2433'; ctx.lineWidth=3*s;
+  ctx.beginPath(); ctx.moveTo(0,-14*s); ctx.lineTo(-4*s+sw,0); ctx.moveTo(0,-14*s); ctx.lineTo(4*s-sw,0); ctx.stroke();
+  // body
+  const bodyCol = u.side===0 ? ['#27b3a0','#1f8f80','#0fd0b0'][u.tier] : ['#7c8aa5','#62708c','#9aa8c4'][u.tier];
+  if(u.tier===2 && u.age===0){ ctx.fillStyle='#4a3b5e'; } else ctx.fillStyle=bodyCol;
+  ctx.fillRect(-6*s,-32*s,12*s,19*s);
+  if(u.side===1){ ctx.strokeStyle='#c43e3e'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,-31*s); ctx.lineTo(0,-20*s); ctx.stroke(); } // the tie
+  // head
+  ctx.fillStyle = u.age===3&&u.tier===2 ? '#e8d9ff' : '#e8c39e';
+  ctx.beginPath(); ctx.arc(0,-38*s,6.5*s,0,7); ctx.fill();
+  if(u.age===0&&u.tier===2){ ctx.fillStyle='#cfcfcf'; ctx.beginPath(); ctx.arc(0,-34*s,5*s,0,Math.PI); ctx.fill(); } // monk beard
+  if(u.age===2){ ctx.fillStyle=bodyCol; ctx.beginPath(); ctx.arc(0,-39*s,7*s,Math.PI,0); ctx.fill(); } // hoodie
+  // era prop in front hand
+  ctx.save(); ctx.translate(9*s,-24*s);
+  const a=u.age,t=u.tier;
+  if(a===0){ if(t===0){ctx.fillStyle='#a87b4f';ctx.fillRect(-2,-5,12,10);} else if(t===1){ctx.fillStyle='#f3ead0';ctx.fillRect(-1,-6,10,12);ctx.fillStyle='#999';ctx.fillRect(1,-4,2,2);ctx.fillRect(5,0,2,2);} else {ctx.fillStyle='#2b2b2b';ctx.fillRect(-2,-4,16,7);} }
+  else if(a===1){ if(t===0){ctx.fillStyle='#d8d2bf';ctx.fillRect(-2,-8,14,12);ctx.fillStyle='#1f4f3f';ctx.fillRect(0,-6,10,8);} else if(t===1){ctx.fillStyle='#222';ctx.fillRect(-1,-5,10,10);ctx.fillStyle='#aaa';ctx.fillRect(1,-3,6,4);} else {ctx.strokeStyle='#9aa8c4';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-2,2);ctx.lineTo(14,-8);ctx.stroke();} }
+  else if(a===2){ if(t===0){ctx.fillStyle='#b8c4d4';ctx.fillRect(-2,-2,14,3);ctx.fillStyle='#27e0c0';ctx.fillRect(-2,-9,14,7);} else if(t===1){ctx.fillStyle='#fff';ctx.fillRect(-1,-7,10,13);ctx.strokeStyle='#888';ctx.lineWidth=1;for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(1,-4+i*4);ctx.lineTo(7,-4+i*4);ctx.stroke();}} else {ctx.fillStyle='#ff5d73';ctx.fillRect(-2,-5,10,8);ctx.fillStyle='#fff';ctx.font='6px monospace';ctx.fillText('!!',0,1);} }
+  else { if(t===0){ctx.fillStyle='#b07cff';ctx.fillRect(-2,-8,13,11);ctx.fillStyle='#fff';ctx.fillRect(0,-6,9,2);} else if(t===2){ctx.fillStyle='rgba(176,124,255,.8)';ctx.beginPath();ctx.arc(4,-2,7,0,7);ctx.fill();} }
+  ctx.restore();
+  // stun stars
+  if(u.stun>0){ ctx.fillStyle='#ffd479'; ctx.font='10px monospace'; ctx.fillText('✶ ✶', -8, -48*s); }
+  ctx.restore();
+  // hp bar
+  if(u.hp<u.maxHp){
+    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(u.x-14,u.y-50*s,28,4);
+    ctx.fillStyle=u.side===0?'#7ee787':'#ff5d73'; ctx.fillRect(u.x-13,u.y-49*s,26*Math.max(0,u.hp/u.maxHp),2);
+  }
+}
+function drawProjectile(p){
+  ctx.save(); ctx.translate(p.x,p.y);
+  if(p.type==='card'){ ctx.rotate(p.spin); ctx.fillStyle='#f3ead0'; ctx.fillRect(-5,-3,10,6); ctx.fillStyle='#999'; ctx.fillRect(-3,-1,1.5,1.5); }
+  else if(p.type==='floppy'){ ctx.rotate(p.spin); ctx.fillStyle='#222'; ctx.fillRect(-5,-5,10,10); ctx.fillStyle='#aaa'; ctx.fillRect(-3,-5,6,4); }
+  else if(p.type==='scroll'){ ctx.rotate(p.spin*0.5); ctx.fillStyle='#fff'; ctx.fillRect(-4,-6,8,12); ctx.fillStyle='#27e0c0'; ctx.fillRect(-2,-4,4,1.5); ctx.fillRect(-2,0,4,1.5); }
+  else if(p.type==='staple'){ ctx.rotate(p.spin); ctx.strokeStyle='#ccc'; ctx.lineWidth=2; ctx.strokeRect(-4,-2,8,4); }
+  else if(p.type==='fireball'){ ctx.fillStyle='#ff9a3d'; ctx.beginPath(); ctx.arc(0,0,6,0,7); ctx.fill(); ctx.fillStyle='#ffd479'; ctx.beginPath(); ctx.arc(0,0,3,0,7); ctx.fill(); }
+  else if(p.type==='pod'){ ctx.fillStyle='#326ce5'; ctx.beginPath(); for(let i=0;i<7;i++){const an=i/7*Math.PI*2; ctx.lineTo(Math.cos(an)*6,Math.sin(an)*6);} ctx.closePath(); ctx.fill(); }
+  else if(p.type==='laser'||p.type==='beamshot'){ ctx.strokeStyle = p.type==='laser'?'#ff4f9a':'#b07cff'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(-(p.vx>0?14:-14),0); ctx.lineTo(0,0); ctx.stroke(); }
+  else if(p.type==='meteor'){ ctx.fillStyle='#ff5d3d'; ctx.beginPath(); ctx.arc(0,0,8,0,7); ctx.fill(); ctx.fillStyle='#ffd479'; ctx.font='8px monospace'; ctx.fillText('git',-7,-9); }
+  ctx.restore();
+}
+function drawFx(){
+  for(const f of S.fx){
+    if(f.type==='rings'){
+      for(let i=0;i<3;i++){
+        const r = (f.t*330+i*60)%520;
+        ctx.strokeStyle='rgba(255,212,121,'+Math.max(0,.7-r/520)+')'; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.arc(f.x,GROUND-90,r,0,7); ctx.stroke();
+      }
+    } else if(f.type==='beam'){
+      const g=ctx.createLinearGradient(f.x-34,0,f.x+34,0);
+      g.addColorStop(0,'rgba(176,124,255,0)'); g.addColorStop(.5,'rgba(255,255,255,.95)'); g.addColorStop(1,'rgba(176,124,255,0)');
+      ctx.fillStyle=g; ctx.fillRect(f.x-34,0,68,GROUND);
+      ctx.fillStyle='#fff'; ctx.font='12px monospace'; ctx.fillText('rm -rf', f.x-20, 60+Math.sin(f.t*9)*5);
+    }
+  }
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  drawBackground();
+  drawBase(0); drawBase(1);
+  for(const u of S.units) drawUnit(u);
+  for(const p of S.projectiles) drawProjectile(p);
+  drawFx();
+  for(const pa of S.particles){ ctx.globalAlpha=1-pa.t/pa.life; ctx.fillStyle=pa.color; ctx.fillRect(pa.x,pa.y,pa.sz,pa.sz); ctx.globalAlpha=1; }
+  for(const fl of S.floats){
+    ctx.globalAlpha=Math.max(0,1-fl.t/fl.life); ctx.fillStyle=fl.color;
+    ctx.font='12px monospace'; ctx.textAlign='center'; ctx.fillText(fl.txt, fl.x, fl.y); ctx.textAlign='left'; ctx.globalAlpha=1;
+  }
+  if(S.flash>0){ ctx.fillStyle='rgba(255,255,255,'+(S.flash*0.6)+')'; ctx.fillRect(0,0,W,H); }
+  if(paused && !S.over){
+    ctx.fillStyle='rgba(5,8,18,.6)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#dfe9ff'; ctx.font='28px monospace'; ctx.textAlign='center';
+    ctx.fillText('PAUSED — even wars need standups', W/2, H/2); ctx.textAlign='left';
+  }
+}
+
+/* ---------------- HUD / shop ---------------- */
+function updateHud(){
+  document.getElementById('hud-money').textContent = '$'+Math.floor(S.money);
+  document.getElementById('hud-income').textContent = '(+$'+S.income+'/s)';
+  document.getElementById('hud-age').textContent = ERAS[S.age].name;
+  document.getElementById('hud-enemy').textContent = 'enemy: '+ERAS[S.enemy.age].name;
+  // xp
+  const need = S.age<3 ? XP_TO_EVOLVE[S.age] : 0;
+  const fill = document.getElementById('xp-fill');
+  const lbl = document.getElementById('xp-label');
+  if(S.age<3){
+    fill.style.width = Math.min(100, S.xp/need*100)+'%';
+    lbl.textContent = Math.floor(S.xp)+' / '+need+' XP';
+    document.getElementById('btn-evolve').disabled = S.xp<need || S.over;
+  } else {
+    fill.style.width='100%'; lbl.textContent='MAX ERA'; document.getElementById('btn-evolve').disabled=true;
+  }
+  // special
+  const sb = document.getElementById('btn-special');
+  document.getElementById('special-name').textContent = ERAS[S.age].special.name;
+  document.getElementById('special-cd').textContent = S.specialCd>0 ? 'recharging '+Math.ceil(S.specialCd)+'s' : 'READY';
+  sb.disabled = S.specialCd>0 || S.over;
+  sb.title = ERAS[S.age].special.desc;
+  // queue chips
+  const qr = document.getElementById('queue-row');
+  qr.innerHTML='';
+  for(const q of S.queue){
+    const c=document.createElement('div'); c.className='chip';
+    const i=document.createElement('i'); i.style.width=Math.min(100,q.t/q.build*100)+'%';
+    c.appendChild(i); qr.appendChild(c);
+  }
+  // affordability
+  document.querySelectorAll('[data-tier]').forEach(b=>{
+    const st = unitStats(S.age, +b.dataset.tier);
+    b.disabled = S.over || S.money<st.cost || S.queue.length>=QUEUE_CAP;
+  });
+  document.querySelectorAll('[data-slot]').forEach(b=>{
+    const slot=+b.dataset.slot, tc=turretStats(S.age).cost;
+    b.disabled = S.over || !!S.turrets[slot] || S.money<tc;
+  });
+}
+function renderShop(){
+  const ur = document.getElementById('units-row'); ur.innerHTML='';
+  ERAS[S.age].units.forEach((u,i)=>{
+    const st = unitStats(S.age,i);
+    const b = document.createElement('button');
+    b.className='btn'; b.dataset.tier=i;
+    b.title = u.desc+'  ·  HP '+st.hp+' · DMG '+st.dmg+(st.ranged?' · ranged':'');
+    b.innerHTML = '<span class="key">'+(i+1)+'</span><span class="nm">'+u.name+'</span><span class="cs">$'+st.cost+'</span>';
+    b.onclick = ()=>{ initAudio(); queueUnit(false,i); updateHud(); };
+    ur.appendChild(b);
+  });
+  const tr = document.getElementById('turret-row'); tr.innerHTML='';
+  for(let slot=0; slot<2; slot++){
+    const ts = turretStats(S.age);
+    const b = document.createElement('button');
+    b.className='btn'; b.dataset.slot=slot;
+    b.title = 'Auto-attacks enemies near your base.';
+    const owned = S.turrets[slot];
+    b.innerHTML = '<span class="key">'+(slot===0?'T':'')+'</span><span class="nm">'+(owned?('✔ '+owned.name):ts.name)+'</span><span class="cs">'+(owned?'deployed':'$'+ts.cost)+'</span>';
+    b.onclick = ()=>{ buyTurret(slot); };
+    tr.appendChild(b);
+  }
+}
+function buyTurret(slot){
+  const ts = turretStats(S.age);
+  if(S.turrets[slot] || S.money<ts.cost || S.over) return;
+  S.money -= ts.cost;
+  S.turrets[slot] = {...ts, cd:0, age:S.age};
+  initAudio(); sfx.turret();
+  ticker('You deployed a '+ts.name+'. Compliance has questions; the enemy has fewer soldiers.');
+  renderShop(); updateHud();
+}
+
+/* ---------------- game flow ---------------- */
+function endGame(){
+  const ov = document.getElementById('overlay');
+  const t = document.getElementById('overlay-title');
+  const sub = document.getElementById('overlay-sub');
+  const btn = document.getElementById('overlay-btn');
+  ov.classList.remove('hidden');
+  if(S.won){
+    t.textContent='VICTORY'; t.style.color='var(--ok)';
+    sub.innerHTML='Legacy Systems Inc. has been acquired for <b>$1</b> and immediately shut down.<br>Their final words: <i>"it works on our machine."</i><br><br>Uptime preserved. Interns promoted. The Friday Deploy ban remains in effect.';
+    sfx.win();
+  } else {
+    t.textContent='DEFEAT'; t.style.color='var(--danger)';
+    sub.innerHTML='Your stack has been deprecated.<br>Legacy Systems Inc. is migrating your base to a COBOL monolith as we speak — the rewrite is scheduled for Q3. Of 1987.<br><br>Post-mortem verdict: <i>root cause — insufficient interns.</i>';
+    sfx.lose();
+  }
+  btn.textContent='REBOOT & RETRY ▸';
+}
+function startGame(){
+  reset();
+  document.getElementById('overlay').classList.add('hidden');
+  renderShop(); updateHud();
+  ticker(HEADLINES[S.tickerIdx]);
+  running = true; paused=false; lastT=0;
+}
+function loop(t){
+  requestAnimationFrame(loop);
+  if(!running) return;
+  if(!lastT) lastT=t;
+  let dt = Math.min(0.05,(t-lastT)/1000); lastT=t;
+  if(!paused && !S.over) update(dt);
+  draw();
+}
+
+/* ---------------- input ---------------- */
+document.getElementById('overlay-btn').addEventListener('click', ()=>{ initAudio(); startGame(); });
+document.getElementById('btn-pause').addEventListener('click', ()=>{ paused=!paused; document.getElementById('btn-pause').textContent = paused?'▶ resume':'⏸ pause'; });
+document.getElementById('btn-mute').addEventListener('click', ()=>{ muted=!muted; document.getElementById('btn-mute').textContent = muted?'🔇 sfx':'🔊 sfx'; });
+document.getElementById('btn-special').addEventListener('click', ()=>{ initAudio(); castSpecial(false); updateHud(); });
+document.getElementById('btn-evolve').addEventListener('click', ()=>{ initAudio(); tryEvolve(false); updateHud(); });
+window.addEventListener('keydown', (e)=>{
+  if(!S || S.over) return;
+  const k=e.key.toLowerCase();
+  if(k==='1'||k==='2'||k==='3'){ initAudio(); queueUnit(false,+k-1); updateHud(); }
+  else if(k==='t'){ buyTurret(S.turrets[0]?1:0); }
+  else if(k==='q'){ initAudio(); castSpecial(false); updateHud(); }
+  else if(k==='e'){ tryEvolve(false); updateHud(); }
+  else if(k==='p'){ document.getElementById('btn-pause').click(); }
+  else if(k==='m'){ document.getElementById('btn-mute').click(); }
+});
+
+reset(); renderShop(); updateHud(); draw();
+requestAnimationFrame(loop);
+
+// exposed for headless smoke-testing; harmless in browsers
+window.__ageofops = {startGame, update, get state(){return S;}, queueUnit, castSpecial, tryEvolve, buyTurret};
+</script>
+</body>
+</html>
