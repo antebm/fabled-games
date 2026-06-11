@@ -1,4 +1,5 @@
-### Prompt: create age of war inspired  web deployable game.create age of war inspired  web deployable game. make a funny twist on the original
+### Prompt: 
+create age of war inspired  web deployable game. make a funny twist on the original
 
 ### Claude Fable (Extra):
  The fair sim has random unit choices, so let me measure the win rate across multiple runs rather than judging from one: 30% win rate for the bot is too punishi…Calibrating difficulty balance for casual enjoymentCalibrating difficulty balance for casual enjoymentThe fair sim has random unit choices, so let me measure the win rate across multiple runs rather than judging from one:Calibrated bot difficulty and economic mechanics for casual playabilityCalibrated bot difficulty and economic mechanics for casual playability30% win rate for the bot is too punishing for casual fun. Tilting the economy slightly toward the player:Validated game balance and prepared final deliverableValidated game balance and prepared final deliverableAGE OF OPS — Age of War, except the ages of mankind are the ages of computing, and you're defending your datacenter from Legacy Systems Inc.
