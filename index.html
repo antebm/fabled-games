@@ -13,14 +13,25 @@
         --dim: #7d8db3;
         --accent: #27e0c0;
         --accent2: #ffb454;
-        --mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+        --mono:
+          ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, Consolas,
+          monospace;
       }
 
-      * { box-sizing: border-box; margin: 0; padding: 0; }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
 
-      html, body {
+      html,
+      body {
         min-height: 100%;
-        background: radial-gradient(1200px 600px at 50% -10%, #14204a 0%, var(--bg) 60%);
+        background: radial-gradient(
+          1200px 600px at 50% -10%,
+          #14204a 0%,
+          var(--bg) 60%
+        );
         color: var(--ink);
         font-family: var(--mono);
       }
@@ -68,7 +79,10 @@
         overflow: hidden;
         text-decoration: none;
         color: inherit;
-        transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+        transition:
+          border-color 0.18s,
+          transform 0.18s,
+          box-shadow 0.18s;
       }
 
       .game-card:hover {
@@ -142,7 +156,21 @@
         <div class="card-thumb">⚙️</div>
         <div class="card-body">
           <div class="card-title">Age of Ops</div>
-          <div class="card-desc">From punch cards to the singularity — manage your way through computing history.</div>
+          <div class="card-desc">
+            From punch cards to the singularity — manage your way through
+            computing history.
+          </div>
+          <div class="card-tag">▶ Play now</div>
+        </div>
+      </a>
+      <a class="game-card" href="gran-mayhem/gran-mayhem.html">
+        <div class="card-thumb">👵</div>
+        <div class="card-body">
+          <div class="card-title">Gran Mayhem</div>
+          <div class="card-desc">
+            A fast-paced action game where you control a granny after too much
+            tea.
+          </div>
           <div class="card-tag">▶ Play now</div>
         </div>
       </a>
